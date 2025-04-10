@@ -304,7 +304,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       />
       
       {!imageLoaded && (
-        <div className="text-gray-400">
+        <div className="absolute inset-0 flex items-center justify-center text-gray-400">
           Upload an image to start masking
         </div>
       )}
