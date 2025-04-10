@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import ImageUploader from '@/components/ImageUploader';
 import ImageCanvas from '@/components/ImageCanvas';
@@ -20,6 +21,11 @@ const Index = () => {
   const handleBack = () => {
     setImageFile(null);
     setSecondImageFile(null);
+  };
+
+  const handleApplyMask = () => {
+    // Dispatch the apply-mask event to trigger the mask application
+    window.dispatchEvent(new Event('apply-mask'));
   };
 
   return (
@@ -54,6 +60,7 @@ const Index = () => {
                 <li>Use the brush tool to mark areas you want to mask</li>
                 <li>Use the eraser tool to remove parts of your mask</li>
                 <li>Upload a second image to replace the masked areas</li>
+                <li>Click the "Apply Mask" button to replace the masked areas</li>
                 <li>Adjust brush size and color as needed</li>
                 <li>Export your final image when finished</li>
               </ol>
@@ -88,6 +95,7 @@ const Index = () => {
                   setSecondImageFile={setSecondImageFile}
                   canvasRef={canvasRef}
                   onReset={handleReset}
+                  onApplyMask={handleApplyMask}
                 />
               </div>
               

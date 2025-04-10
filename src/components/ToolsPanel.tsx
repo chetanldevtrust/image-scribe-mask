@@ -1,7 +1,8 @@
+
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Brush, Eraser, RotateCcw, Download, ImagePlus } from 'lucide-react';
+import { Brush, Eraser, RotateCcw, Download, ImagePlus, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ImageUploader from './ImageUploader';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -19,6 +20,7 @@ interface ToolsPanelProps {
   setSecondImageFile: (file: File | null) => void;
   canvasRef: React.RefObject<HTMLCanvasElement>;
   onReset: () => void;
+  onApplyMask: () => void;
 }
 
 const ToolsPanel: React.FC<ToolsPanelProps> = ({
@@ -32,7 +34,8 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
   secondImageFile,
   setSecondImageFile,
   canvasRef,
-  onReset
+  onReset,
+  onApplyMask
 }) => {
   const colorPickerRef = useRef<HTMLInputElement>(null);
 
@@ -218,6 +221,20 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
               </PopoverContent>
             </Popover>
           )}
+        </div>
+        
+        {/* Add Apply Mask button */}
+        <div className="pt-4">
+          <Button 
+            variant="default"
+            size="sm"
+            className="w-full flex items-center justify-center gap-2"
+            onClick={onApplyMask}
+            disabled={!imageFile || !secondImageFile}
+          >
+            <Wand2 className="w-4 h-4" />
+            <span>Apply Mask</span>
+          </Button>
         </div>
       </div>
     </div>

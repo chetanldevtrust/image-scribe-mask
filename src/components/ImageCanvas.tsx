@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { fileToDataUrl, canvasToDataUrl, createMaskedImageUrl } from '@/utils/imgixUtils';
@@ -34,8 +33,8 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [maskUrl, setMaskUrl] = useState<string | null>(null);
   const [secondImageUrl, setSecondImageUrl] = useState<string | null>(null);
+  const [maskApplied, setMaskApplied] = useState(false);
   
-  // Reset the canvas when the reset button is clicked
   useEffect(() => {
     const resetMaskCanvas = () => {
       const maskCanvas = maskCanvasRef.current;
@@ -62,7 +61,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     };
   }, [toast]);
 
-  // Convert imageFile to URL when it changes
   useEffect(() => {
     if (!imageFile) return;
     
@@ -81,9 +79,10 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     };
     
     loadImage();
+    
+    setMaskApplied(false);
   }, [imageFile, toast]);
 
-  // Load the main image onto the canvas when the imageUrl changes
   useEffect(() => {
     if (!imageUrl) return;
     
@@ -99,7 +98,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     img.src = imageUrl;
     
     img.onload = () => {
-      // Set canvas dimensions to match the image
       const maxWidth = containerRef.current?.clientWidth || window.innerWidth - 40;
       const maxHeight = containerRef.current?.clientHeight || window.innerHeight - 200;
       
@@ -107,7 +105,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       let height = img.height;
       let scale = 1;
       
-      // Scale down the image if it's too large
       if (width > maxWidth || height > maxHeight) {
         const scaleX = maxWidth / width;
         const scaleY = maxHeight / height;
@@ -117,35 +114,29 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         height = height * scale;
       }
       
-      // Set the canvas dimensions
       imageCanvas.width = width;
       imageCanvas.height = height;
       maskCanvas.width = width;
       maskCanvas.height = height;
       
-      // Also set secondImageCanvas dimensions if it exists
       if (secondImageCanvasRef.current) {
         secondImageCanvasRef.current.width = width;
         secondImageCanvasRef.current.height = height;
       }
       
-      // Draw the image on the image canvas
       imageCtx.clearRect(0, 0, width, height);
       imageCtx.drawImage(img, 0, 0, width, height);
       
-      // Clear the mask canvas
       maskCtx.clearRect(0, 0, width, height);
       
       setImageSize({ width, height });
       setCanvasScale(scale);
       setImageLoaded(true);
       
-      // Merge the canvases
       mergeCanvasLayers();
     };
   }, [imageUrl]);
 
-  // Convert secondImageFile to URL when it changes
   useEffect(() => {
     if (!secondImageFile) return;
     
@@ -159,13 +150,13 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     };
     
     loadSecondImage();
+    
+    setMaskApplied(false);
   }, [secondImageFile]);
 
-  // Load the second image when secondImageUrl changes
   useEffect(() => {
     if (!secondImageUrl || !imageLoaded) return;
     
-    // Create second image canvas if it doesn't exist
     if (!secondImageCanvasRef.current) {
       secondImageCanvasRef.current = document.createElement('canvas');
     }
@@ -181,20 +172,16 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     img.src = secondImageUrl;
     
     img.onload = () => {
-      // Clear canvas
       secondImgCtx.clearRect(0, 0, secondImgCanvas.width, secondImgCanvas.height);
       
-      // Draw the second image on the canvas, stretching to fill the canvas
       secondImgCtx.drawImage(img, 0, 0, secondImgCanvas.width, secondImgCanvas.height);
       
       setSecondImageLoaded(true);
       
-      // Merge the canvases to update display
       mergeCanvasLayers();
     };
   }, [secondImageUrl, imageLoaded, imageSize]);
 
-  // Update mask URL whenever the mask canvas changes
   useEffect(() => {
     if (!maskCanvasRef.current || !imageLoaded) return;
     
@@ -205,7 +192,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       }
     };
     
-    // Create a MutationObserver to watch for changes to the mask canvas
     const observer = new MutationObserver(updateMaskUrl);
     observer.observe(maskCanvasRef.current, { 
       attributes: true, 
@@ -228,55 +214,68 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Set the main canvas dimensions
     canvas.width = imageSize.width;
     canvas.height = imageSize.height;
     
-    // Clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // If we have all necessary components for imgix masking
-    if (imageUrl && maskUrl && secondImageUrl && secondImageLoaded) {
-      // Use local canvas for immediate preview while imgix processes
-      // Draw the image layer first
-      ctx.drawImage(imageCanvas, 0, 0);
-      
-      // Create a temporary canvas to prepare the overlay
+    if (maskApplied && imageUrl && maskUrl && secondImageUrl && secondImageLoaded) {
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
       const tempCtx = tempCanvas.getContext('2d');
       
       if (tempCtx && secondImageCanvasRef.current) {
-        // Draw the second image to the temp canvas
         tempCtx.drawImage(secondImageCanvasRef.current, 0, 0);
         
-        // Use the mask as a clipping path for the second image
         tempCtx.globalCompositeOperation = 'destination-in';
         tempCtx.drawImage(maskCanvas, 0, 0);
         
-        // Draw the masked second image onto the main canvas
         ctx.drawImage(tempCanvas, 0, 0);
       }
-      
-      // Update the mask URL for imgix processing
-      if (maskCanvas) {
-        const newMaskUrl = canvasToDataUrl(maskCanvas);
-        if (newMaskUrl !== maskUrl) {
-          setMaskUrl(newMaskUrl);
-        }
-      }
     }
-    // If we only have the base image and mask (no second image yet), show the mask as overlay
-    else if (imageCanvas && maskCanvas) {
+    else if (imageCanvas && maskCanvas && !maskApplied) {
       ctx.drawImage(imageCanvas, 0, 0);
+      ctx.globalAlpha = 0.5;
       ctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(maskCanvas, 0, 0);
+      ctx.globalAlpha = 1.0;
     }
     
-    // Reset composite operation
     ctx.globalCompositeOperation = 'source-over';
   };
+
+  const handleApplyMask = () => {
+    if (!imageUrl || !maskUrl || !secondImageUrl) {
+      toast({
+        title: "Cannot Apply Mask",
+        description: "Please ensure you have both an image and replacement image uploaded",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setMaskApplied(true);
+    
+    toast({
+      title: "Mask Applied",
+      description: "The masked area has been replaced with your uploaded image"
+    });
+    
+    mergeCanvasLayers();
+  };
+
+  useEffect(() => {
+    const applyMaskHandler = () => {
+      handleApplyMask();
+    };
+    
+    window.addEventListener('apply-mask', applyMaskHandler);
+    
+    return () => {
+      window.removeEventListener('apply-mask', applyMaskHandler);
+    };
+  }, [imageUrl, maskUrl, secondImageUrl]);
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!imageLoaded) return;
@@ -296,7 +295,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     ctx.beginPath();
     ctx.moveTo(x, y);
     
-    // Set up brush styles
     ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -326,7 +324,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     ctx.lineTo(x, y);
     ctx.stroke();
     
-    // Merge the layers to update the display
     mergeCanvasLayers();
   };
 
@@ -342,7 +339,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     ctx.closePath();
     setIsDrawing(false);
     
-    // Reset composite operation
     ctx.globalCompositeOperation = 'source-over';
   };
 
@@ -351,19 +347,16 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       ref={containerRef}
       className={`image-canvas-container relative h-full w-full rounded-lg ${tool === 'brush' ? 'editing-cursor-brush' : 'editing-cursor-eraser'}`}
     >
-      {/* Main canvas for display */}
       <canvas 
         ref={canvasRef}
         className="absolute top-0 left-0 right-0 bottom-0 m-auto"
       />
       
-      {/* Image canvas layer (hidden) */}
       <canvas 
         ref={imageCanvasRef}
         className="hidden"
       />
       
-      {/* Mask canvas layer for drawing (visible but with pointer events) */}
       <canvas 
         ref={maskCanvasRef}
         className="absolute top-0 left-0 right-0 bottom-0 m-auto"
@@ -371,6 +364,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         onMouseMove={draw}
         onMouseUp={stopDrawing}
         onMouseLeave={stopDrawing}
+        style={{ pointerEvents: maskApplied ? 'none' : 'auto' }}
       />
       
       {!imageLoaded && (
@@ -380,6 +374,10 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       )}
     </div>
   );
+};
+
+ImageCanvas.handleApplyMask = () => {
+  window.dispatchEvent(new Event('apply-mask'));
 };
 
 export default ImageCanvas;
