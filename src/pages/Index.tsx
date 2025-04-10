@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import ImageUploader from '@/components/ImageUploader';
 import ImageCanvas from '@/components/ImageCanvas';
@@ -43,7 +42,7 @@ const Index = () => {
             <div className="mb-8 text-center">
               <h2 className="text-3xl font-bold mb-3">Upload an Image to Start Masking</h2>
               <p className="text-gray-600 dark:text-gray-400">
-                Upload your image and use our tools to mask areas for editing or replacement
+                Upload your image and use our tools to mask areas for editing or replacement with imgix
               </p>
             </div>
             <ImageUploader onImageUpload={setImageFile} />
@@ -109,7 +108,7 @@ const Index = () => {
 
       {/* Footer */}
       <footer className="p-4 text-center text-gray-500 text-sm">
-        <p>Image Scribe Mask &copy; {new Date().getFullYear()} - Create beautiful image masks</p>
+        <p>Image Scribe Mask &copy; {new Date().getFullYear()} - Create beautiful image masks with imgix</p>
       </footer>
     </div>
   );

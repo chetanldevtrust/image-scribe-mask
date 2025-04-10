@@ -1,4 +1,3 @@
-
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -6,6 +5,7 @@ import { Brush, Eraser, RotateCcw, Download, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import ImageUploader from './ImageUploader';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { createMaskedImageUrl, fileToDataUrl, canvasToDataUrl } from '@/utils/imgixUtils';
 
 interface ToolsPanelProps {
   tool: 'brush' | 'eraser';
@@ -50,13 +50,14 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!canvasRef.current || !imageFile) {
       toast.error("No image to export");
       return;
     }
 
     try {
+      // For local export (fallback)
       const canvas = canvasRef.current;
       const dataUrl = canvas.toDataURL('image/png');
       

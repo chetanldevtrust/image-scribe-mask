@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { fileToDataUrl, canvasToDataUrl, createMaskedImageUrl } from '@/utils/imgixUtils';
 
 interface ImageCanvasProps {
   imageFile: File | null;
@@ -30,6 +31,9 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const [secondImageLoaded, setSecondImageLoaded] = useState(false);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [canvasScale, setCanvasScale] = useState(1);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [maskUrl, setMaskUrl] = useState<string | null>(null);
+  const [secondImageUrl, setSecondImageUrl] = useState<string | null>(null);
   
   // Reset the canvas when the reset button is clicked
   useEffect(() => {
@@ -58,9 +62,30 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     };
   }, [toast]);
 
-  // Load the main image onto the canvas when the imageFile changes
+  // Convert imageFile to URL when it changes
   useEffect(() => {
     if (!imageFile) return;
+    
+    const loadImage = async () => {
+      try {
+        const dataUrl = await fileToDataUrl(imageFile);
+        setImageUrl(dataUrl);
+      } catch (error) {
+        console.error("Error converting image file to data URL:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load image",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    loadImage();
+  }, [imageFile, toast]);
+
+  // Load the main image onto the canvas when the imageUrl changes
+  useEffect(() => {
+    if (!imageUrl) return;
     
     const imageCanvas = imageCanvasRef.current;
     const maskCanvas = maskCanvasRef.current;
@@ -71,7 +96,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     if (!imageCtx || !maskCtx) return;
     
     const img = new Image();
-    img.src = URL.createObjectURL(imageFile);
+    img.src = imageUrl;
     
     img.onload = () => {
       // Set canvas dimensions to match the image
@@ -117,14 +142,28 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       
       // Merge the canvases
       mergeCanvasLayers();
-      
-      URL.revokeObjectURL(img.src);
     };
-  }, [imageFile]);
+  }, [imageUrl]);
 
-  // Load the second image when it changes
+  // Convert secondImageFile to URL when it changes
   useEffect(() => {
-    if (!secondImageFile || !imageLoaded) return;
+    if (!secondImageFile) return;
+    
+    const loadSecondImage = async () => {
+      try {
+        const dataUrl = await fileToDataUrl(secondImageFile);
+        setSecondImageUrl(dataUrl);
+      } catch (error) {
+        console.error("Error converting second image file to data URL:", error);
+      }
+    };
+    
+    loadSecondImage();
+  }, [secondImageFile]);
+
+  // Load the second image when secondImageUrl changes
+  useEffect(() => {
+    if (!secondImageUrl || !imageLoaded) return;
     
     // Create second image canvas if it doesn't exist
     if (!secondImageCanvasRef.current) {
@@ -139,7 +178,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     if (!secondImgCtx) return;
     
     const img = new Image();
-    img.src = URL.createObjectURL(secondImageFile);
+    img.src = secondImageUrl;
     
     img.onload = () => {
       // Clear canvas
@@ -152,16 +191,37 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       
       // Merge the canvases to update display
       mergeCanvasLayers();
-      
-      URL.revokeObjectURL(img.src);
     };
-  }, [secondImageFile, imageLoaded, imageSize]);
+  }, [secondImageUrl, imageLoaded, imageSize]);
+
+  // Update mask URL whenever the mask canvas changes
+  useEffect(() => {
+    if (!maskCanvasRef.current || !imageLoaded) return;
+    
+    const updateMaskUrl = () => {
+      if (maskCanvasRef.current) {
+        const dataUrl = canvasToDataUrl(maskCanvasRef.current);
+        setMaskUrl(dataUrl);
+      }
+    };
+    
+    // Create a MutationObserver to watch for changes to the mask canvas
+    const observer = new MutationObserver(updateMaskUrl);
+    observer.observe(maskCanvasRef.current, { 
+      attributes: true, 
+      childList: true, 
+      subtree: true 
+    });
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, [imageLoaded]);
 
   const mergeCanvasLayers = () => {
     const canvas = canvasRef.current;
     const imageCanvas = imageCanvasRef.current;
     const maskCanvas = maskCanvasRef.current;
-    const secondImgCanvas = secondImageCanvasRef.current;
     
     if (!canvas || !imageCanvas) return;
     
@@ -175,20 +235,21 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     // Clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw the image layer first
-    ctx.drawImage(imageCanvas, 0, 0);
-    
-    // If we have a second image and mask, use them
-    if (secondImgCanvas && maskCanvas && secondImageLoaded) {
+    // If we have all necessary components for imgix masking
+    if (imageUrl && maskUrl && secondImageUrl && secondImageLoaded) {
+      // Use local canvas for immediate preview while imgix processes
+      // Draw the image layer first
+      ctx.drawImage(imageCanvas, 0, 0);
+      
       // Create a temporary canvas to prepare the overlay
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
       const tempCtx = tempCanvas.getContext('2d');
       
-      if (tempCtx) {
+      if (tempCtx && secondImageCanvasRef.current) {
         // Draw the second image to the temp canvas
-        tempCtx.drawImage(secondImgCanvas, 0, 0);
+        tempCtx.drawImage(secondImageCanvasRef.current, 0, 0);
         
         // Use the mask as a clipping path for the second image
         tempCtx.globalCompositeOperation = 'destination-in';
@@ -197,9 +258,18 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         // Draw the masked second image onto the main canvas
         ctx.drawImage(tempCanvas, 0, 0);
       }
-    } 
-    // If we only have the mask (no second image yet), show it as overlay
-    else if (maskCanvas) {
+      
+      // Update the mask URL for imgix processing
+      if (maskCanvas) {
+        const newMaskUrl = canvasToDataUrl(maskCanvas);
+        if (newMaskUrl !== maskUrl) {
+          setMaskUrl(newMaskUrl);
+        }
+      }
+    }
+    // If we only have the base image and mask (no second image yet), show the mask as overlay
+    else if (imageCanvas && maskCanvas) {
+      ctx.drawImage(imageCanvas, 0, 0);
       ctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(maskCanvas, 0, 0);
     }
