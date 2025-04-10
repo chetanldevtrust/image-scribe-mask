@@ -8,6 +8,7 @@ import { ArrowLeft, Info } from 'lucide-react';
 
 const Index = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [secondImageFile, setSecondImageFile] = useState<File | null>(null);
   const [tool, setTool] = useState<'brush' | 'eraser'>('brush');
   const [brushSize, setBrushSize] = useState(20);
   const [brushColor, setBrushColor] = useState('#3B82F6');
@@ -19,6 +20,7 @@ const Index = () => {
   
   const handleBack = () => {
     setImageFile(null);
+    setSecondImageFile(null);
   };
 
   return (
@@ -52,8 +54,9 @@ const Index = () => {
                 <li>Upload an image using the uploader above</li>
                 <li>Use the brush tool to mark areas you want to mask</li>
                 <li>Use the eraser tool to remove parts of your mask</li>
+                <li>Upload a second image to replace the masked areas</li>
                 <li>Adjust brush size and color as needed</li>
-                <li>Export your masked image when finished</li>
+                <li>Export your final image when finished</li>
               </ol>
             </div>
           </div>
@@ -82,6 +85,8 @@ const Index = () => {
                   brushColor={brushColor}
                   setBrushColor={setBrushColor}
                   imageFile={imageFile}
+                  secondImageFile={secondImageFile}
+                  setSecondImageFile={setSecondImageFile}
                   canvasRef={canvasRef}
                   onReset={handleReset}
                 />
@@ -90,6 +95,7 @@ const Index = () => {
               <div className="flex-1 bg-editor-bg rounded-lg overflow-hidden shadow-lg">
                 <ImageCanvas 
                   imageFile={imageFile}
+                  secondImageFile={secondImageFile}
                   tool={tool}
                   brushSize={brushSize}
                   brushColor={brushColor}

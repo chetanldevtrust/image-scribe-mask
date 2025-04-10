@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 
 interface ImageCanvasProps {
   imageFile: File | null;
+  secondImageFile: File | null;
   tool: 'brush' | 'eraser';
   brushSize: number;
   brushColor: string;
@@ -12,6 +13,7 @@ interface ImageCanvasProps {
 
 const ImageCanvas: React.FC<ImageCanvasProps> = ({ 
   imageFile, 
+  secondImageFile,
   tool, 
   brushSize, 
   brushColor,
@@ -21,9 +23,11 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imageCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const secondImageCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [secondImageLoaded, setSecondImageLoaded] = useState(false);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [canvasScale, setCanvasScale] = useState(1);
   
@@ -54,7 +58,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     };
   }, [toast]);
 
-  // Load the image onto the canvas when the imageFile changes
+  // Load the main image onto the canvas when the imageFile changes
   useEffect(() => {
     if (!imageFile) return;
     
@@ -94,6 +98,12 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       maskCanvas.width = width;
       maskCanvas.height = height;
       
+      // Also set secondImageCanvas dimensions if it exists
+      if (secondImageCanvasRef.current) {
+        secondImageCanvasRef.current.width = width;
+        secondImageCanvasRef.current.height = height;
+      }
+      
       // Draw the image on the image canvas
       imageCtx.clearRect(0, 0, width, height);
       imageCtx.drawImage(img, 0, 0, width, height);
@@ -112,12 +122,48 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     };
   }, [imageFile]);
 
+  // Load the second image when it changes
+  useEffect(() => {
+    if (!secondImageFile || !imageLoaded) return;
+    
+    // Create second image canvas if it doesn't exist
+    if (!secondImageCanvasRef.current) {
+      secondImageCanvasRef.current = document.createElement('canvas');
+    }
+    
+    const secondImgCanvas = secondImageCanvasRef.current;
+    secondImgCanvas.width = imageSize.width;
+    secondImgCanvas.height = imageSize.height;
+    
+    const secondImgCtx = secondImgCanvas.getContext('2d');
+    if (!secondImgCtx) return;
+    
+    const img = new Image();
+    img.src = URL.createObjectURL(secondImageFile);
+    
+    img.onload = () => {
+      // Clear canvas
+      secondImgCtx.clearRect(0, 0, secondImgCanvas.width, secondImgCanvas.height);
+      
+      // Draw the second image on the canvas, stretching to fill the canvas
+      secondImgCtx.drawImage(img, 0, 0, secondImgCanvas.width, secondImgCanvas.height);
+      
+      setSecondImageLoaded(true);
+      
+      // Merge the canvases to update display
+      mergeCanvasLayers();
+      
+      URL.revokeObjectURL(img.src);
+    };
+  }, [secondImageFile, imageLoaded, imageSize]);
+
   const mergeCanvasLayers = () => {
     const canvas = canvasRef.current;
     const imageCanvas = imageCanvasRef.current;
     const maskCanvas = maskCanvasRef.current;
+    const secondImgCanvas = secondImageCanvasRef.current;
     
-    if (!canvas || !imageCanvas || !maskCanvas) return;
+    if (!canvas || !imageCanvas) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -129,12 +175,34 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     // Clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw the image layer
+    // Draw the image layer first
     ctx.drawImage(imageCanvas, 0, 0);
     
-    // Draw the mask layer with compositing
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.drawImage(maskCanvas, 0, 0);
+    // If we have a second image and mask, use them
+    if (secondImgCanvas && maskCanvas && secondImageLoaded) {
+      // Create a temporary canvas to prepare the overlay
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      if (tempCtx) {
+        // Draw the second image to the temp canvas
+        tempCtx.drawImage(secondImgCanvas, 0, 0);
+        
+        // Use the mask as a clipping path for the second image
+        tempCtx.globalCompositeOperation = 'destination-in';
+        tempCtx.drawImage(maskCanvas, 0, 0);
+        
+        // Draw the masked second image onto the main canvas
+        ctx.drawImage(tempCanvas, 0, 0);
+      }
+    } 
+    // If we only have the mask (no second image yet), show it as overlay
+    else if (maskCanvas) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(maskCanvas, 0, 0);
+    }
     
     // Reset composite operation
     ctx.globalCompositeOperation = 'source-over';

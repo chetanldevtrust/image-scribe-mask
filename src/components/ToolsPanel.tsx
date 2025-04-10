@@ -2,8 +2,10 @@
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Brush, Eraser, RotateCcw, Download, Undo } from 'lucide-react';
+import { Brush, Eraser, RotateCcw, Download, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
+import ImageUploader from './ImageUploader';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface ToolsPanelProps {
   tool: 'brush' | 'eraser';
@@ -13,6 +15,8 @@ interface ToolsPanelProps {
   brushColor: string;
   setBrushColor: (color: string) => void;
   imageFile: File | null;
+  secondImageFile: File | null;
+  setSecondImageFile: (file: File | null) => void;
   canvasRef: React.RefObject<HTMLCanvasElement>;
   onReset: () => void;
 }
@@ -25,6 +29,8 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
   brushColor,
   setBrushColor,
   imageFile,
+  secondImageFile,
+  setSecondImageFile,
   canvasRef,
   onReset
 }) => {
@@ -73,6 +79,11 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
     onReset();
     // Dispatch a custom event to reset the mask canvas
     window.dispatchEvent(new Event('reset-mask-canvas'));
+  };
+
+  const handleSecondImageUpload = (file: File) => {
+    setSecondImageFile(file);
+    toast.success("Replacement image uploaded successfully");
   };
 
   return (
@@ -148,6 +159,65 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
             </div>
           </div>
         )}
+        
+        <div className="pt-4 border-t border-gray-700">
+          <label className="text-xs text-gray-400 block mb-2">Replacement Image</label>
+          {secondImageFile ? (
+            <div className="space-y-2">
+              <div className="text-xs text-gray-300 truncate">
+                {secondImageFile.name}
+              </div>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={() => setSecondImageFile(null)}
+                >
+                  Remove
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full text-xs"
+                    >
+                      Change
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">Upload New Image</h4>
+                      <ImageUploader onImageUpload={handleSecondImageUpload} />
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          ) : (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full flex items-center justify-center gap-2"
+                  disabled={!imageFile}
+                >
+                  <ImagePlus className="w-4 h-4" />
+                  <span>Upload Replacement</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Upload Replacement Image</h4>
+                  <p className="text-xs text-gray-500">This image will replace the masked areas.</p>
+                  <ImageUploader onImageUpload={handleSecondImageUpload} />
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
       </div>
     </div>
   );
